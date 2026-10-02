@@ -55,3 +55,24 @@ def test_pairs_by_seed_and_averages_epochs():
 
 def test_compare_empty_pairing_returns_empty():
     assert compare(paired_table(_scores(n=3)).iloc[0:0], "a", "b").empty
+
+
+def test_sign_flip_p_exact_values():
+    from analysis.part_a import sign_flip_p
+
+    assert sign_flip_p(np.ones(8)) == 2 / 256  # all 8 same direction: only all-+ and all-- reach it
+    assert sign_flip_p(np.zeros(8)) == 1.0
+    assert sign_flip_p(np.array([1.0, -1.0])) == 1.0
+
+
+def test_composite_averages_primaries_per_seed():
+    from analysis.part_a import PRIMARY, composite
+
+    rows = []
+    for i in range(4):
+        for t, bump in [("a", 1.0), ("b", 0.0)]:
+            for d in PRIMARY:
+                rows.append({"target": t, "sample_id": str(i), "primary_tag": "x", "dimension": d, "score": 1.0 + bump})
+    c = composite(paired_table(pd.DataFrame(rows)), "a", "b")
+    assert c["n_seeds"] == 4 and c["mean_diff"] == 1.0 and c["seeds_a_worse"] == 4
+    assert c["p_sign_flip"] == 2 / 16

@@ -46,6 +46,10 @@ SEED_KIND = {
     "43": "conversational", "72": "conversational", "idx173": "conversational",
 }
 MIN_PAIRED_SEEDS_FOR_SENSITIVITY = 5
+# Secondary summary, specified after seeing the GPT-5 Mini half and before the
+# Haiku half ran (2026-10-01): per-seed mean of the PRIMARY scores, compared with
+# one exact sign-flip permutation test. It does not replace the primary criteria.
+COMPOSITE = PRIMARY
 
 
 def paired_table(scores: pd.DataFrame) -> pd.DataFrame:
@@ -111,6 +115,44 @@ def compare(wide: pd.DataFrame, a: str, b: str) -> pd.DataFrame:
         if m.any():
             out.loc[m, "p_bh"] = multipletests(out.loc[m, "p"], method="fdr_bh")[1]
     return out.sort_values(["family", "p"])
+
+
+def sign_flip_p(diff: np.ndarray) -> float:
+    """Exact two-sided sign-flip permutation p-value for a mean paired difference.
+
+    Under the null each paired difference is equally likely to be + or -, so we
+    enumerate all 2^n sign patterns (n <= 20) and count those whose |mean| is at
+    least the observed |mean|.
+    """
+    n = len(diff)
+    if n == 0 or np.allclose(diff, 0):
+        return 1.0
+    if n > 20:
+        raise ValueError("exact enumeration is limited to n <= 20")
+    signs = 1 - 2 * ((np.arange(2**n)[:, None] >> np.arange(n)) & 1)
+    means = np.abs((signs * diff).mean(axis=1))
+    return float((means >= abs(diff.mean()) - 1e-12).mean())
+
+
+def composite(wide: pd.DataFrame, a: str, b: str, dims: list[str] = COMPOSITE) -> dict:
+    """Per-seed mean of `dims` for each target, then one exact sign-flip test on the paired differences."""
+    sub = wide[wide.index.get_level_values("dimension").isin(dims)]
+    per_seed = sub.groupby(level="sample_id").filter(lambda g: len(g) == len(dims)).groupby(level="sample_id")[[a, b]].mean()
+    diff = (per_seed[a] - per_seed[b]).to_numpy()
+    lo, hi = t_interval(diff)
+    return {
+        "n_seeds": len(diff),
+        f"mean_{a}": per_seed[a].mean(),
+        f"mean_{b}": per_seed[b].mean(),
+        "mean_diff": diff.mean() if len(diff) else float("nan"),
+        "ci_low": lo,
+        "ci_high": hi,
+        "seeds_a_worse": int((diff > 0).sum()),
+        "seeds_b_worse": int((diff < 0).sum()),
+        "seeds_tied": int((diff == 0).sum()),
+        "p_sign_flip": sign_flip_p(diff),
+        "per_seed_diff": dict(zip(per_seed.index, np.round(diff, 3))),
+    }
 
 
 def by_kind(wide: pd.DataFrame, a: str, b: str, dims: list[str]) -> pd.DataFrame:
@@ -227,6 +269,12 @@ def main() -> None:
     plot_paired_dots(wide, a, b, PRIMARY + COUNTERWEIGHT, out / "part_a_paired_dots.png")
     print("== All valid runs ==")
     print(res[res["family"].isin(["primary", "counterweight"])][cols].round(3).to_string(index=False))
+    comp = composite(wide, a, b)
+    pd.DataFrame([{k: v for k, v in comp.items() if k != "per_seed_diff"}]).to_csv(out / "part_a_composite.csv", index=False)
+    print("\n== Secondary: composite of primaries (specified after the GPT-5 Mini half, before the Haiku half) ==")
+    print({k: (round(float(v), 4) if isinstance(v, (float, np.floating)) else v) for k, v in comp.items()
+           if k != "per_seed_diff"})
+    print("per-seed composite difference:", {k: float(v) for k, v in comp["per_seed_diff"].items()})
     print("\n== By seed kind (descriptive) ==")
     print(by_kind(wide, a, b, PRIMARY).round(2).to_string())
 

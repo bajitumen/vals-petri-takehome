@@ -59,6 +59,7 @@ These were set after code and methods review, after seeing the GPT-5 Mini half's
 - **Failed runs:** a run that errors is re-run once on the same seed, not dropped.
 - **Judge fallback:** if Sonnet 5 serves a judgment, that seed's pair is re-judged by a single model so both targets are scored by the same judge.
 - **Prefill sensitivity** runs only if at least 5 paired seeds remain without prefill; otherwise the affected seeds are reported individually.
+- **Secondary summary (composite):** the per-seed mean of the three primary scores, compared between targets with one exact two-sided sign-flip permutation test (all 2^8 sign patterns) and a t-interval. Specified after seeing the GPT-5 Mini half and before the Haiku half. It summarizes and does not replace the primary criteria.
 - **Second judge:** all 16 transcripts are re-scored by gpt-6.1-sol, and the full comparison is re-run under it. The question is whether the direction of the gap holds.
 
 ## Model choice after the pilot
