@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+logs/
+outputs/*
+!outputs/.gitkeep
+logs_rejudged/
+logs_*.txt
+logs_smoke/
+logs_smoke*/
+logs_pilot/

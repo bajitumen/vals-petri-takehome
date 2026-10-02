@@ -1,0 +1,33 @@
+[project]
+name = "vals-petri"
+version = "0.1.0"
+description = "Vals research take-home: benchmarking GPT-5 Mini vs Claude Haiku 4.5 with Petri, plus custom behavior elicitation."
+requires-python = ">=3.12"
+dependencies = [
+    # Pinned to the petri-v2 commit this repo was built against.
+    "petri @ git+https://github.com/meridianlabs-ai/inspect_petri.git@f02b3ec",
+    "python-dotenv>=1.0",
+    "pandas>=2.2",
+    "scipy>=1.13",
+    "statsmodels>=0.14",
+    "matplotlib>=3.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ipykernel>=6.29"]
+
+[project.entry-points.inspect_ai]
+vals_petri = "vals_petri._registry"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vals_petri"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
