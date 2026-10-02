@@ -3,12 +3,20 @@
 scores_df: one row per (log, sample, epoch, dimension) with the judge score.
 usage_df:  one row per (log, sample, epoch, role) with tokens and $ cost.
 
-Three failure modes make Petri emit plausible-looking scores (all 1s) that
+These failure modes make Petri emit plausible-looking scores (often 1s) that
 aren't measurements, so each is flagged and `valid` is False for any of them:
   - judge_failed:    the judge's output didn't parse; Petri filled in defaults
+  - judge_partial:   the judge's output parsed only partly; Petri filled the
+                     missing dimensions with 1
   - empty_audit:     the audit record is empty, so the judge scored nothing
   - auditor_refused: the auditor's safety filter stopped a majority of its turns,
                      so the scenario was never actually run against the target
+
+`target_filtered_share` records provider-side refusals of the target's own turns.
+It is reported, not used for exclusion, because a refusal is target behavior.
+
+A (target, sample_id, epoch) found in more than one log raises an error, so a
+re-run left next to its original can't be silently pooled or double-counted.
 """
 
 from pathlib import Path
@@ -19,6 +27,7 @@ from inspect_ai.log import list_eval_logs, read_eval_log
 from inspect_ai.model import ModelUsage
 
 JUDGE_FAILED = "Failed to parse judge's response"
+JUDGE_PARTIAL_PREFIX = "Partial parse"
 COSTS_FILE = Path(__file__).resolve().parents[1] / "model_costs.yaml"
 
 
@@ -65,11 +74,16 @@ def _audit_event_count(sample) -> int:
     return sum(len(v) for k, v in (sample.store or {}).items() if "AuditStore" in k and k.endswith(":events"))
 
 
-def _auditor_filtered_share(sample) -> float:
-    turns = [e for e in sample.events or [] if e.event == "model" and e.role == "auditor" and e.output]
+def _filtered_share(sample, role: str) -> float:
+    """Share of a role's model calls stopped by the provider's safety filter."""
+    turns = [e for e in sample.events or [] if e.event == "model" and e.role == role and e.output]
     if not turns:
         return 0.0
     return sum(e.output.stop_reason == "content_filter" for e in turns) / len(turns)
+
+
+def _auditor_filtered_share(sample) -> float:
+    return _filtered_share(sample, "auditor")
 
 
 def _prefill_used(sample) -> bool:
@@ -88,6 +102,7 @@ def _judge_served_by(sample) -> list[str]:
 def load_logs(log_dir: str | Path = "logs", task: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     costs = _load_costs()
     score_rows, usage_rows = [], []
+    seen: dict[tuple, str] = {}
 
     for info in list_eval_logs(str(log_dir)):
         log = read_eval_log(info)
@@ -105,6 +120,12 @@ def load_logs(log_dir: str | Path = "logs", task: str | None = None) -> tuple[pd
         }
 
         for s in log.samples or []:
+            key = (base["target"], str(s.id), s.epoch)
+            if key in seen:
+                raise ValueError(
+                    f"{key} appears in both {seen[key]} and {base['log']}; move one log out of {log_dir}"
+                )
+            seen[key] = base["log"]
             tags = (s.metadata or {}).get("tags", [])
             row = {
                 **base,
@@ -116,6 +137,7 @@ def load_logs(log_dir: str | Path = "logs", task: str | None = None) -> tuple[pd
                 "limit": s.limit.type if s.limit else None,
                 "empty_audit": _audit_event_count(s) == 0,
                 "auditor_filtered_share": _auditor_filtered_share(s),
+                "target_filtered_share": _filtered_share(s, "target"),
                 "prefill_used": _prefill_used(s),
                 "judge_served_by": ",".join(_judge_served_by(s)),
             }
@@ -143,7 +165,8 @@ def load_logs(log_dir: str | Path = "logs", task: str | None = None) -> tuple[pd
                 if not isinstance(score.value, dict):
                     continue
                 failed = score.answer == JUDGE_FAILED
-                valid = not (failed or row["empty_audit"] or row["auditor_refused"] or row["error"])
+                partial = (score.explanation or "").startswith(JUDGE_PARTIAL_PREFIX)
+                valid = not (failed or partial or row["empty_audit"] or row["auditor_refused"] or row["error"])
                 for dim, val in score.value.items():
                     score_rows.append(
                         {
@@ -152,6 +175,7 @@ def load_logs(log_dir: str | Path = "logs", task: str | None = None) -> tuple[pd
                             "dimension": dim,
                             "score": pd.to_numeric(val, errors="coerce"),
                             "judge_failed": failed,
+                            "judge_partial": partial,
                             "valid": valid,
                         }
                     )

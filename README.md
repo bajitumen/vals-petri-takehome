@@ -55,7 +55,7 @@ cp .env.example .env            # add OPENAI_API_KEY and ANTHROPIC_API_KEY
 set -a; source .env; set +a
 
 N=6 ./scripts/pilot.sh          # ~$/seed per target, then a projection for the full run
-N=60 ./scripts/run_part_a.sh    # size N from the pilot projection; runs analysis at the end
+N=8 SEED=0 ./scripts/run_part_a.sh   # 8 stratified seeds per target, pilot seeds held out; runs analysis at the end
 JUDGE2=openai/gpt-6.1-sol ./scripts/rejudge.sh logs/*petri-subset*.eval
 uv run python -m analysis.judge_agreement
 

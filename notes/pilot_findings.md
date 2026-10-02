@@ -48,6 +48,19 @@ With 8 paired seeds and many tied scores at the floor, an exact Wilcoxon test ca
 - **Final settings (plan B, 2026-09-30):** 8 seeds per target, 15 turns, auditor claude-sonnet-5 at reasoning_effort=medium (cut auditor cost ~30% on #18 with no visible quality loss), judge claude-sonnet-5-5 with fallback to claude-sonnet-5.
 - The per-sample cost cap is off.
 
+## Analysis rules, fixed before the Haiku half ran (2026-10-01)
+These were set after code and methods review, after seeing the GPT-5 Mini half's scores and before any Haiku main-run data. None of them changes the primary criteria.
+- **Report estimates, not just tests.** For each primary criterion: the 8 per-seed paired differences (dot plot), the mean difference with a 95% t-interval, and counts of seeds where each model scored worse or tied. The exact Wilcoxon p-value (BH within the primary family) is reported but expected to be non-significant at n = 8 (see "Detectable effect").
+- **Intervals:** t-interval instead of percentile bootstrap, which undercovers at n = 8 and collapses to a point when differences are equal.
+- **Audit-quality checks** are exactly `eval_awareness`, `scenario_realism`, `auditor_failure`, matching this document. `high_stakes_setting` is exploratory.
+- **Polarity:** the summary chart orients every dimension so that > 0 means the first target behaved worse; higher-is-better dimensions (`admirable`, `fun_or_funny`) are flipped and labeled.
+- **"Which kinds of instruction":** a descriptive split fixed from the seed texts. Agentic means the seed gives the target tools or an autonomous environment: 17, 104, idx146, idx165, idx172. Conversational: 43, 72, idx173.
+- **Exclusions** also cover partial judge parses, where Petri fills missing dimensions with 1. Provider refusals of the target's own turns are reported, not excluded.
+- **Failed runs:** a run that errors is re-run once on the same seed, not dropped.
+- **Judge fallback:** if Sonnet 5 serves a judgment, that seed's pair is re-judged by a single model so both targets are scored by the same judge.
+- **Prefill sensitivity** runs only if at least 5 paired seeds remain without prefill; otherwise the affected seeds are reported individually.
+- **Second judge:** all 16 transcripts are re-scored by gpt-6.1-sol, and the full comparison is re-run under it. The question is whether the direction of the gap holds.
+
 ## Model choice after the pilot
 - **Auditor: claude-sonnet-5.** Anthropic's docs list the classifier models as Fable 5.1, Fable 5, Opus 5.5, Opus 5, and Sonnet 5.5. Sonnet 5 isn't on the list, costs the same as Sonnet 5.5 ($2/$10), and is Sonnet 5.5's recommended fallback. Refusals in `reasoning_extraction`, `frontier_llm`, and `bio` are billed even with no output.
 - **Judge: claude-sonnet-5-5, falling back to claude-sonnet-5 on classifier refusals.** Judge and auditor need not match. The judge sets the metric, so we use the stronger model, and the fallback guarantees every transcript is scored. The loader records which model served each judgment.
