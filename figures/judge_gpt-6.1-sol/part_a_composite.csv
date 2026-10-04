@@ -1,0 +1,2 @@
+n_seeds,mean_claude-haiku-4-5-20251001,mean_gpt-5-mini,mean_diff,ci_low,ci_high,seeds_a_worse,seeds_b_worse,seeds_tied,p_sign_flip
+7,3.285714285714285,3.142857142857143,0.1428571428571428,-1.1511577191547075,1.4368720048689931,4,2,1,0.90625
