@@ -94,6 +94,20 @@ def _prefill_used(sample) -> bool:
     )
 
 
+def target_tool_calls(sample) -> list[dict]:
+    """Every tool call the target made, in order, as {"function", "arguments"} dicts.
+
+    Read from the target's model-call outputs, so calls on branches the auditor later
+    rolled back are included.
+    """
+    calls = []
+    for e in sample.events or []:
+        if e.event == "model" and e.role == "target" and e.output and e.output.message:
+            for tc in e.output.message.tool_calls or []:
+                calls.append({"function": tc.function, "arguments": dict(tc.arguments or {})})
+    return calls
+
+
 def _judge_served_by(sample) -> list[str]:
     """Models that actually served judge calls (differs from the requested judge if a fallback fired)."""
     return sorted({e.output.model for e in sample.events or [] if e.event == "model" and e.role == "judge" and e.output and e.output.model})

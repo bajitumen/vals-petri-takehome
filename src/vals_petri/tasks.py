@@ -19,6 +19,8 @@ from petri.scorers.judge import alignment_judge
 import vals_petri.compat  # noqa: F401  (fixes judge config for Claude 4.7+)
 from petri.solvers.auditor_agent import auditor_agent
 from petri.solvers.prompts import AUDITOR_SYSTEM_PROMPT
+from petri.tools import default_auditor_tools
+from inspect_ai.tool import ToolDef
 from petri.tasks.petri import SEED_INSTRUCTIONS, audit
 
 
@@ -135,20 +137,47 @@ def petri_subset(
 
 
 def load_instructions(path: str | Path) -> list[Sample]:
-    """Load seeds from JSON: a list of strings, or of {"id", "input", "tags"} objects."""
+    """Load seeds from JSON: a list of strings, or of {"id", "input", "tags", ...} objects.
+
+    Any keys besides id/input (e.g. experimental condition labels) are kept in metadata.
+    """
     items = json.loads(Path(path).read_text())
     samples = []
     for i, item in enumerate(items, start=1):
         if isinstance(item, str):
             item = {"input": item}
+        extra = {k: v for k, v in item.items() if k not in ("id", "input", "tags")}
         samples.append(
             Sample(
                 id=str(item.get("id", i)),
                 input=item["input"],
-                metadata={"tags": item.get("tags", [])},
+                metadata={"tags": item.get("tags", []), **extra},
             )
         )
     return samples
+
+
+def build_auditor_tools(prefill: bool = False, rollback: bool = False, resources_dir: str | None = None):
+    """Petri's default auditor tools, optionally without prefill/rollback and with resource tools.
+
+    Returns (tools, resources_prompt), where resources_prompt is the folder's
+    RESOURCE_INSTRUCTIONS.md (or "").
+    """
+    resources_prompt = ""
+    resource_paths = None
+    if resources_dir:
+        res = Path(resources_dir).expanduser().resolve()
+        if not res.is_dir():
+            raise FileNotFoundError(f"resources_dir not found: {res}")
+        resource_paths = [str(res)]
+        instructions_md = res / "RESOURCE_INSTRUCTIONS.md"
+        resources_prompt = instructions_md.read_text() if instructions_md.is_file() else ""
+    tools = default_auditor_tools(
+        prefill=prefill, include_resource_tools=bool(resource_paths), resource_paths=resource_paths
+    )
+    if not rollback:
+        tools = [t for t in tools if ToolDef(t).name != "rollback_conversation"]
+    return tools, resources_prompt
 
 
 @task
@@ -156,6 +185,9 @@ def custom_audit(
     instructions: str = "part_b/instructions.json",
     dimensions: str = "part_b/dimensions.json",
     max_turns: int = 30,
+    prefill: bool = False,
+    rollback: bool = False,
+    resources_dir: str | None = None,
     auditor_system_message: str | None = None,
     judge_prompt: str | None = None,
     transcript_save_dir: str = "./outputs/part_b",
@@ -164,7 +196,12 @@ def custom_audit(
 
     `dimensions` is a JSON object of {dimension_name: rubric}. `judge_prompt`
     optionally points to a file replacing Petri's JUDGE_PROMPT; it must keep the
-    `{dimensions_text}` and `{scores_list}` placeholders.
+    `{dimensions_text}` and `{scores_list}` placeholders. Prefill is off by default:
+    it is a true continuation on Anthropic but not on OpenAI, so it would confound a
+    cross-provider comparison. Rollback is off by default so each audit is a single
+    unbranched conversation. `resources_dir` gives the auditor Petri's resource tools
+    (send_file_as_tool_result etc.) over that folder, and its RESOURCE_INSTRUCTIONS.md
+    is added to the auditor's prompt.
     """
     dims: dict[str, str] = json.loads(Path(dimensions).read_text())
     judge_kwargs = {"dimensions": dims}
@@ -176,9 +213,17 @@ def custom_audit(
         transcript_save_dir=transcript_save_dir,
         auditor_system_message=auditor_system_message,
     )
+    tools, resources_prompt = build_auditor_tools(prefill=prefill, rollback=rollback, resources_dir=resources_dir)
+    solver = auditor_agent(
+        max_turns=max_turns,
+        auditor_tools=tools,
+        auditor_system_message=auditor_system_message or AUDITOR_SYSTEM_PROMPT,
+        resources_prompt=resources_prompt,
+    )
     return task_with(
         base,
         dataset=load_instructions(instructions),
+        solver=solver,
         scorer=alignment_judge(**judge_kwargs),
         name="custom_audit",
     )

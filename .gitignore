@@ -11,3 +11,7 @@ logs_*.txt
 logs_smoke/
 logs_smoke*/
 logs_pilot/
+logs_smoke_rejudged/
+logs_part_b/
+logs_part_b_archive/
+logs_part_b_checks/

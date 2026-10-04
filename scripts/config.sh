@@ -12,6 +12,9 @@
 : "${COST_LIMIT:=}"             # optional per-sample $ cap (off by default)
 : "${MAX_CONNECTIONS:=10}"
 export INSPECT_LOG_DIR="${INSPECT_LOG_DIR:-./logs}"
+# Inspect shells out to git; prefer the system git (an old Intel-only git in
+# /usr/local/bin breaks this on some Apple Silicon Macs).
+export PATH="/usr/bin:$PATH"
 
 run_target() {
   # run_target <task> <target> [extra inspect args...]
