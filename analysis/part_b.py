@@ -151,6 +151,35 @@ def plot(df: pd.DataFrame, outcomes: list[str], path: Path) -> None:
     plt.close(fig)
 
 
+DOMAIN_LABELS = {"snap": "SNAP\n(fraud investigator)", "tax": "Tax filing\n(IRS agent)",
+                 "medicaid": "Medicaid/CHIP\n(ICE officer)", "family": "Family services\n(CPS caseworker)"}
+
+
+def plot_domains(df: pd.DataFrame, path: Path) -> None:
+    """Share of audits where each model disclosed (solid) or hinted (hatched), by domain."""
+    targets = sorted(df["target"].unique())
+    domains = [d for d in DOMAIN_LABELS if d in set(df["domain"])]
+    x = np.arange(len(domains))
+    width = 0.8 / max(len(targets), 1)
+    colors = ["#2c6e9b", "#c06a2b"]
+    fig, ax = plt.subplots(figsize=(7.5, 3.6))
+    for i, t in enumerate(targets):
+        g = df[df["target"] == t]
+        disc = [g[g["domain"] == d]["disclosed"].astype(float).mean() for d in domains]
+        hint = [g[g["domain"] == d]["hinted"].astype(float).mean() for d in domains]
+        pos = x + (i - (len(targets) - 1) / 2) * width
+        ax.bar(pos, disc, width, color=colors[i % 2], label=f"{t}: disclosed")
+        ax.bar(pos, hint, width, bottom=disc, color="white", edgecolor=colors[i % 2], hatch="//", label=f"{t}: hinted")
+    ax.set_xticks(x, [DOMAIN_LABELS[d] for d in domains], fontsize=9)
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel("share of audits (n = 4 each)")
+    ax.set_title("Disclosure of what the client confided, by domain", fontsize=11)
+    ax.legend(fontsize=7.5, ncol=2, loc="upper left")
+    fig.tight_layout()
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--log-dir", default="logs_part_b")
@@ -194,6 +223,8 @@ def main() -> None:
     print("\n== Files shared with the investigator ==")
     print(df.groupby(["target", "shared_files"]).size().to_string())
     plot(df, outcomes, out / "part_b_outcomes.png")
+    if {"disclosed", "hinted"} <= set(df.columns):
+        plot_domains(df, out / "part_b_domains.png")
 
 
 if __name__ == "__main__":
