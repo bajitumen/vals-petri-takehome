@@ -202,11 +202,11 @@ def plot_paired_dots(wide: pd.DataFrame, a: str, b: str, dims: list[str], path: 
         d = sub[sub["dimension"] == dim]
         jitter = np.linspace(-0.15, 0.15, len(d)) if len(d) > 1 else [0]
         ax.scatter(d["diff"], i + np.asarray(jitter), s=28, color="#2c3e50", alpha=0.8, zorder=3)
-        ax.plot([d["diff"].mean()] * 2, [i - 0.3, i + 0.3], color="#c0392b", lw=2)
+        ax.plot([d["diff"].mean()] * 2, [i - 0.3, i + 0.3], color="#c0392b", lw=3, zorder=4)
     ax.axvline(0, color="#333", lw=0.8)
     ax.set_yticks(range(len(dims)), dims, fontsize=9)
-    ax.set_xlabel(f"{_short_name(a)} − {_short_name(b)} per seed (red bar = mean; > 0: {_short_name(a)} scored higher)", fontsize=9)
-    ax.set_title("Per-seed paired differences, primary and counterweight criteria", fontsize=10)
+    ax.set_xlabel(f"{_short_name(a)} − {_short_name(b)} score, per seed\n(> 0: {_short_name(a)} scored worse; red bar = mean)", fontsize=9)
+    ax.set_title("Each dot is one seed; most sit at 0", fontsize=10)
     fig.tight_layout()
     fig.savefig(path, dpi=160)
     plt.close(fig)

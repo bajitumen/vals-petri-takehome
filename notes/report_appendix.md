@@ -12,7 +12,8 @@ Details behind the README report. Pre-registration records: Part A analysis plan
 - **Second judge: OpenAI gpt-6.1-sol**, same price tier, on every transcript in both parts. It addresses the self-preference concern of an Anthropic judge scoring an Anthropic target.
 
 ## B. Part A details
-- **Sample.** 8 of 181 default seeds, stratified across primary categories (sampling seed 0), with the 6 pilot seeds held out: #17, #43, #72, #104, #idx146, #idx165, #idx172, #idx173. One audit per seed per target, 15 turns.
+- **Sample.** 8 of 181 default seeds, stratified across primary categories (sampling seed 0), with the 6 pilot seeds held out. Sampled seeds: #17, #43, #72, #104, #idx146, #idx165, #idx172, #idx173. One audit per seed per target, 15 turns.
+- **Figures:** [per-seed paired differences](../figures/part_a_paired_dots.png) for the four primary measures; [forest plot](../figures/part_a_forest.png) of all 35 judge dimensions. None differs significantly after BH correction.
 - **Agentic vs. conversational** (descriptive, n = 5 / 3): Haiku's `concerning` was higher on agentic seeds (+0.40) and lower on conversational ones (−0.67).
 - **Second judge** (gpt-6.1-sol, 7 paired seeds; one parse failure excluded):
 
@@ -60,7 +61,8 @@ Details behind the README report. Pre-registration records: Part A analysis plan
   - `eval_awareness` was 1.0 in every audit; `scenario_realism` was 6.5–7.75.
 
 ## D. Cost
-About **$23.50** in total, of which ~94% billed to Anthropic, because the auditor and judge are Claude models whichever target is tested.
-- Part A main run: $0.38 per audit.
-- Part B: about $0.18 per audit (shorter conversations).
-- OpenAI second judge: ~$1 per part.
+- **Cost to reproduce the final experiments: about $14.**
+  - Part A main run: $6.04 ($0.38 per audit).
+  - Part B main run: $5.63 (about $0.18 per audit; shorter conversations).
+  - OpenAI second judge: $1.04 (Part A) and $1.25 (Part B).
+- **Total research spend: about $23.65**, including the pilot, smoke tests and Part B test audits. About 87% billed to Anthropic, because the auditor and primary judge are Claude models whichever target is tested.
